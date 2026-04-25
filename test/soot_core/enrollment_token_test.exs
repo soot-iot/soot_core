@@ -33,4 +33,16 @@ defmodule SootCore.EnrollmentTokenTest do
     {:ok, _et, plaintext} = Factories.mint_token(t.id, d.id, -10)
     assert {:error, _} = SootCore.EnrollmentToken.find_active(plaintext)
   end
+
+  test "find_active rejects an already-consumed token", %{tenant: t, device: d} do
+    {:ok, et, plaintext} = Factories.mint_token(t.id, d.id)
+    {:ok, _} = SootCore.EnrollmentToken.consume(et)
+
+    assert {:error, _} = SootCore.EnrollmentToken.find_active(plaintext)
+  end
+
+  test "find_active with bogus plaintext yields NotFound" do
+    assert {:error, %Ash.Error.Invalid{errors: [%Ash.Error.Query.NotFound{} | _]}} =
+             SootCore.EnrollmentToken.find_active("totally-not-a-real-token")
+  end
 end

@@ -51,11 +51,13 @@ defmodule SootCore.DeviceShadow do
 
     update :update_desired do
       accept [:desired]
+      require_atomic? false
       change atomic_update(:version, expr(version + 1))
     end
 
     update :update_reported do
       accept [:reported]
+      require_atomic? false
       change set_attribute(:last_reported_at, &DateTime.utc_now/0)
       change atomic_update(:version, expr(version + 1))
     end

@@ -33,4 +33,21 @@ defmodule SootCore.TenantTest do
     {:ok, t} = SootCore.Tenant.archive(t)
     assert t.status == :archived
   end
+
+  test "get_by_slug returns the tenant; missing slug → NotFound" do
+    {:ok, t} = SootCore.Tenant.create("acme", "Acme")
+    assert {:ok, found} = SootCore.Tenant.get_by_slug("acme")
+    assert found.id == t.id
+
+    assert {:error, %Ash.Error.Invalid{errors: [%Ash.Error.Query.NotFound{} | _]}} =
+             SootCore.Tenant.get_by_slug("nope")
+  end
+
+  test "create accepts issuing_ca_id and metadata" do
+    fake_ca_id = Ecto.UUID.generate()
+    {:ok, t} = SootCore.Tenant.create("acme", "Acme", %{issuing_ca_id: fake_ca_id, metadata: %{"region" => "eu"}})
+
+    assert t.issuing_ca_id == fake_ca_id
+    assert t.metadata == %{"region" => "eu"}
+  end
 end

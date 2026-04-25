@@ -77,6 +77,7 @@ defmodule SootCore.ProductionBatch do
 
     update :close do
       accept []
+      require_atomic? false
       change set_attribute(:status, :closed)
     end
 

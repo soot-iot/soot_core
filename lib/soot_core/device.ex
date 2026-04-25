@@ -139,6 +139,7 @@ defmodule SootCore.Device do
     update :touch do
       description "Stamp last_seen_at to now."
       accept []
+      require_atomic? false
       change set_attribute(:last_seen_at, &DateTime.utc_now/0)
     end
 

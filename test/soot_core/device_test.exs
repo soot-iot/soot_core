@@ -55,4 +55,40 @@ defmodule SootCore.DeviceTest do
     assert {:error, _} = SootCore.Device.create_unprovisioned(t1.id, "SHARED-SERIAL")
     assert {:ok, _} = SootCore.Device.create_unprovisioned(t2.id, "SHARED-SERIAL")
   end
+
+  test "touch stamps last_seen_at", %{tenant: t} do
+    {:ok, dev} = SootCore.Device.create_unprovisioned(t.id, "TOUCH-SERIAL")
+    assert is_nil(dev.last_seen_at)
+
+    before = DateTime.utc_now()
+    {:ok, dev} = SootCore.Device.touch(dev)
+
+    assert %DateTime{} = dev.last_seen_at
+    assert DateTime.compare(dev.last_seen_at, before) in [:gt, :eq]
+  end
+
+  test "get_by_serial scopes to tenant", %{tenant: t1} do
+    %{tenant: t2} = Factories.fresh_tenant!("beta")
+
+    {:ok, d1} = SootCore.Device.create_unprovisioned(t1.id, "DUPE")
+    {:ok, _d2} = SootCore.Device.create_unprovisioned(t2.id, "DUPE")
+
+    {:ok, found} = SootCore.Device.get_by_serial(t1.id, "DUPE")
+    assert found.id == d1.id
+
+    assert {:error, %Ash.Error.Invalid{errors: [%Ash.Error.Query.NotFound{} | _]}} =
+             SootCore.Device.get_by_serial(t1.id, "MISSING")
+  end
+
+  test "for_tenant lists only the tenant's devices", %{tenant: t1} do
+    %{tenant: t2} = Factories.fresh_tenant!("beta")
+
+    {:ok, _} = SootCore.Device.create_unprovisioned(t1.id, "T1-A")
+    {:ok, _} = SootCore.Device.create_unprovisioned(t1.id, "T1-B")
+    {:ok, _} = SootCore.Device.create_unprovisioned(t2.id, "T2-A")
+
+    {:ok, devices} = SootCore.Device.for_tenant(t1.id)
+    assert length(devices) == 2
+    assert Enum.all?(devices, &(&1.tenant_id == t1.id))
+  end
 end
