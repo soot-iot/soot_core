@@ -45,7 +45,8 @@ defmodule SootCore.MixProject do
       {:ash_pki, path: "../ash_pki"},
       {:plug, "~> 1.19"},
       {:jason, "~> 1.4"},
-      {:nimble_csv, "~> 1.3"}
+      {:nimble_csv, "~> 1.3"},
+      {:igniter, "~> 0.6", optional: true}
     ]
   end
 end
