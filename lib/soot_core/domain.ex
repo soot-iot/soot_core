@@ -5,6 +5,8 @@ defmodule SootCore.Domain do
   use Ash.Domain, otp_app: :soot_core, validate_config_inclusion?: false
 
   resources do
+    allow_unregistered? true
+
     resource SootCore.Tenant
     resource SootCore.SerialScheme
     resource SootCore.ProductionBatch
