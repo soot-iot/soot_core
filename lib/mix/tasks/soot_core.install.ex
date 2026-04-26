@@ -2,7 +2,7 @@ defmodule Mix.Tasks.SootCore.Install.Docs do
   @moduledoc false
 
   def short_doc do
-    "Installs the Soot core devices domain into a project"
+    "Installs soot_core: registers domain and mounts /enroll behind :device_mtls"
   end
 
   def example do
@@ -13,15 +13,22 @@ defmodule Mix.Tasks.SootCore.Install.Docs do
     """
     #{short_doc()}
 
-    Generates a `Devices` domain in the operator's app, plus stub
-    resources for `Tenant`, `SerialScheme`, `ProductionBatch`,
-    `Device`, and `EnrollmentToken`. The `Device` resource is wired
-    with `AshStateMachine` so the operator can fill in the
-    `unprovisioned → bootstrapped → operational ⇄ quarantined → retired`
-    transitions documented in `SPEC.md` §5.2.
+    `SootCore.Domain` ships its `Tenant`, `SerialScheme`,
+    `ProductionBatch`, `Device`, `DeviceShadow`, and `EnrollmentToken`
+    resources as concrete library modules. The installer registers
+    that domain in the operator's `:ash_domains` config rather than
+    generating empty stub copies.
+
+    The installer also creates a `:device_mtls` Phoenix pipeline (the
+    first Soot library to need it) and mounts
+    `forward "/enroll", SootCore.Plug.Enroll` inside that pipeline's
+    scope. Sibling installers (`soot_telemetry`, `soot_contracts`)
+    add their own forwards into the same scope.
 
     Composed by `mix soot.install`; can also be run standalone on a
     fresh project.
+
+    See `GENERATOR-SPEC.md` in the `soot` package for the full design.
 
     ## Example
 
@@ -32,8 +39,7 @@ defmodule Mix.Tasks.SootCore.Install.Docs do
     ## Options
 
       * `--example` — same shape as the rest of the Soot installers;
-        currently a no-op for `soot_core` since the resource stubs are
-        already minimal starting points the operator extends.
+        currently a no-op for `soot_core`.
       * `--yes` — answer yes to dependency-fetching prompts.
     """
   end
@@ -61,193 +67,108 @@ if Code.ensure_loaded?(Igniter) do
 
     @impl Igniter.Mix.Task
     def igniter(igniter) do
-      app_name = Igniter.Project.Application.app_name(igniter)
-      devices_module = Igniter.Project.Module.module_name(igniter, "Devices")
-
       igniter
       |> Igniter.Project.Formatter.import_dep(:soot_core)
-      |> create_devices_domain(devices_module)
-      |> create_tenant(devices_module)
-      |> create_serial_scheme(devices_module)
-      |> create_production_batch(devices_module)
-      |> create_device(devices_module)
-      |> create_enrollment_token(devices_module)
-      |> note_next_steps(app_name)
+      |> register_domain()
+      |> mount_enroll_route()
+      |> note_next_steps()
     end
 
-    defp create_devices_domain(igniter, devices_module) do
-      Igniter.Project.Module.create_module(
+    defp register_domain(igniter) do
+      app = Igniter.Project.Application.app_name(igniter)
+
+      Igniter.Project.Config.configure(
         igniter,
-        devices_module,
-        """
-        @moduledoc \"\"\"
-        Devices domain — owns the Soot core resources that describe
-        the fleet (tenants, serial schemes, batches, devices, and
-        enrollment tokens).
-
-        Generated stub. Operators add their own resources to the
-        `resources` block as the project grows; the framework does
-        not re-touch this file once generated.
-        \"\"\"
-
-        use Ash.Domain, otp_app: :#{Igniter.Project.Application.app_name(igniter)}
-
-        resources do
-          resource #{inspect(Module.concat([devices_module, "Tenant"]))}
-          resource #{inspect(Module.concat([devices_module, "SerialScheme"]))}
-          resource #{inspect(Module.concat([devices_module, "ProductionBatch"]))}
-          resource #{inspect(Module.concat([devices_module, "Device"]))}
-          resource #{inspect(Module.concat([devices_module, "EnrollmentToken"]))}
+        "config.exs",
+        app,
+        [:ash_domains],
+        [SootCore.Domain],
+        updater: fn list ->
+          Igniter.Code.List.prepend_new_to_list(list, SootCore.Domain)
         end
-        """
       )
     end
 
-    defp create_tenant(igniter, devices_module) do
-      module = Module.concat([devices_module, "Tenant"])
+    # Adds a `:device_mtls` pipeline (if missing) and a `forward
+    # "/enroll", SootCore.Plug.Enroll` inside that scope. Idempotent:
+    # detects an existing forward to SootCore.Plug.Enroll and leaves
+    # the router alone if found.
+    defp mount_enroll_route(igniter) do
+      {igniter, router} =
+        Igniter.Libs.Phoenix.select_router(
+          igniter,
+          "Which Phoenix router should the /enroll endpoint be mounted in?"
+        )
 
-      Igniter.Project.Module.create_module(
-        igniter,
-        module,
-        """
-        @moduledoc \"\"\"
-        Top-level isolation boundary. Every other Soot resource is
-        scoped to a tenant.
+      cond do
+        router == nil ->
+          Igniter.add_warning(igniter, """
+          No Phoenix router found. The /enroll device-facing endpoint
+          was not mounted. After your router is set up, re-run
+          `mix igniter.install soot_core`.
+          """)
 
-        Generated stub — fill in attributes, actions, and policies
-        for your deployment.
-        \"\"\"
-
-        use Ash.Resource,
-          otp_app: :#{Igniter.Project.Application.app_name(igniter)},
-          domain: #{inspect(devices_module)}
-
-        actions do
-        end
-        """
-      )
+        true ->
+          igniter
+          |> ensure_device_mtls_pipeline(router)
+          |> maybe_add_enroll_forward(router)
+      end
     end
 
-    defp create_serial_scheme(igniter, devices_module) do
-      module = Module.concat([devices_module, "SerialScheme"])
+    defp ensure_device_mtls_pipeline(igniter, router) do
+      case Igniter.Libs.Phoenix.has_pipeline(igniter, router, :device_mtls) do
+        {igniter, true} ->
+          igniter
 
-      Igniter.Project.Module.create_module(
-        igniter,
-        module,
-        """
-        @moduledoc \"\"\"
-        Serial-number scheme used to allocate device serials within a
-        tenant (e.g. `ACME-{seq:6}`).
-
-        Generated stub — fill in attributes, actions, and policies
-        for your deployment.
-        \"\"\"
-
-        use Ash.Resource,
-          otp_app: :#{Igniter.Project.Application.app_name(igniter)},
-          domain: #{inspect(devices_module)}
-
-        actions do
-        end
-        """
-      )
+        {igniter, false} ->
+          Igniter.Libs.Phoenix.add_pipeline(
+            igniter,
+            :device_mtls,
+            "plug AshPki.Plug.MTLS, require_known_certificate: true",
+            router: router
+          )
+      end
     end
 
-    defp create_production_batch(igniter, devices_module) do
-      module = Module.concat([devices_module, "ProductionBatch"])
-
-      Igniter.Project.Module.create_module(
-        igniter,
-        module,
-        """
-        @moduledoc \"\"\"
-        Group of devices manufactured together. Used for bulk
-        pre-provisioning and lifecycle reporting.
-
-        Generated stub — fill in attributes, actions, and policies
-        for your deployment.
-        \"\"\"
-
-        use Ash.Resource,
-          otp_app: :#{Igniter.Project.Application.app_name(igniter)},
-          domain: #{inspect(devices_module)}
-
-        actions do
-        end
-        """
-      )
+    defp maybe_add_enroll_forward(igniter, router) do
+      if enroll_route_present?(igniter, router) do
+        igniter
+      else
+        Igniter.Libs.Phoenix.append_to_scope(
+          igniter,
+          "/",
+          ~s|forward "/enroll", SootCore.Plug.Enroll|,
+          router: router,
+          with_pipelines: [:device_mtls]
+        )
+      end
     end
 
-    defp create_device(igniter, devices_module) do
-      module = Module.concat([devices_module, "Device"])
+    defp enroll_route_present?(igniter, router) do
+      {_, _source, zipper} = Igniter.Project.Module.find_module!(igniter, router)
 
-      Igniter.Project.Module.create_module(
-        igniter,
-        module,
-        """
-        @moduledoc \"\"\"
-        A unit in the fleet.
-
-        State machine (see `SPEC.md` §5.2):
-
-            unprovisioned → bootstrapped → operational ⇄ quarantined
-                                                ↓
-                                             retired
-
-        Generated stub — fill in the `state_machine` block,
-        attributes, actions, and policies for your deployment.
-        \"\"\"
-
-        use Ash.Resource,
-          otp_app: :#{Igniter.Project.Application.app_name(igniter)},
-          domain: #{inspect(devices_module)},
-          extensions: [AshStateMachine]
-
-        actions do
-        end
-        """
-      )
+      case Igniter.Code.Common.move_to(zipper, fn z ->
+             Igniter.Code.Function.function_call?(z, :forward, 2) and
+               Igniter.Code.Function.argument_equals?(z, 1, SootCore.Plug.Enroll)
+           end) do
+        {:ok, _} -> true
+        :error -> false
+      end
     end
 
-    defp create_enrollment_token(igniter, devices_module) do
-      module = Module.concat([devices_module, "EnrollmentToken"])
-
-      Igniter.Project.Module.create_module(
-        igniter,
-        module,
-        """
-        @moduledoc \"\"\"
-        Single-use token issued by the operator and redeemed by a
-        device at `/enroll` to upgrade from a bootstrap cert to an
-        operational cert.
-
-        Generated stub — fill in attributes, actions, and policies
-        for your deployment.
-        \"\"\"
-
-        use Ash.Resource,
-          otp_app: :#{Igniter.Project.Application.app_name(igniter)},
-          domain: #{inspect(devices_module)}
-
-        actions do
-        end
-        """
-      )
-    end
-
-    defp note_next_steps(igniter, app_name) do
+    defp note_next_steps(igniter) do
       Igniter.add_notice(igniter, """
       soot_core installed.
 
-      The Devices domain and resource stubs were generated under
-      `lib/#{app_name}/devices/`. Each stub is a minimal starting
-      point — flesh out attributes, actions, relationships, and
-      policies as your fleet model grows.
+      `SootCore.Domain` is registered in `:ash_domains`. It ships the
+      `Tenant`, `SerialScheme`, `ProductionBatch`, `Device`,
+      `DeviceShadow`, and `EnrollmentToken` resources as concrete
+      library modules — no stubs to flesh out.
 
-      The Device resource is pre-wired with `AshStateMachine`. Add
-      a `state_machine do ... end` block describing the
-      `unprovisioned → bootstrapped → operational ⇄ quarantined → retired`
-      transitions documented in `SPEC.md` §5.2.
+      The device-facing enrollment endpoint `/enroll` is mounted
+      behind a new `:device_mtls` Phoenix pipeline (mTLS via
+      `AshPki.Plug.MTLS`). Sibling Soot installers add their own
+      forwards into the same scope.
 
       Next steps:
 
