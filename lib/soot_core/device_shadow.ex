@@ -1,5 +1,7 @@
 defmodule SootCore.DeviceShadow do
   @moduledoc """
+  Default `DeviceShadow` resource shipped with `soot_core`.
+
   Server-side representation of a device's shadow state.
 
   Holds two maps — `desired` (what the backend wants the device to be) and
@@ -9,70 +11,20 @@ defmodule SootCore.DeviceShadow do
 
   Last-write-wins per top-level key in v1; AWS/Azure-style nested merge is
   deferred.
+
+  The schema is provided by the `SootCore.Resource.DeviceShadow` extension.
+  This default uses `Ash.DataLayer.Ets`; production deployments override
+  with their own resource module backed by `AshPostgres.DataLayer` and
+  register it via `config :soot_core, device_shadow: MyApp.DeviceShadow`.
   """
 
   use Ash.Resource,
     otp_app: :soot_core,
     domain: SootCore.Domain,
-    data_layer: Ash.DataLayer.Ets
+    data_layer: Ash.DataLayer.Ets,
+    extensions: [SootCore.Resource.DeviceShadow]
 
   ets do
     private? false
-  end
-
-  attributes do
-    uuid_primary_key :id
-
-    attribute :device_id, :uuid, allow_nil?: false, public?: true
-    attribute :desired, :map, default: %{}, public?: true
-    attribute :reported, :map, default: %{}, public?: true
-    attribute :last_reported_at, :utc_datetime_usec, public?: true
-    attribute :version, :integer, default: 0, public?: true
-
-    create_timestamp :inserted_at
-    update_timestamp :updated_at
-  end
-
-  identities do
-    identity :one_per_device, [:device_id], pre_check_with: SootCore.Domain
-  end
-
-  relationships do
-    belongs_to :device, SootCore.Device do
-      attribute_writable? false
-      source_attribute :device_id
-      destination_attribute :id
-      public? true
-    end
-  end
-
-  actions do
-    defaults [:read, :destroy, create: [:device_id, :desired, :reported]]
-
-    update :update_desired do
-      accept [:desired]
-      require_atomic? false
-      change atomic_update(:version, expr(version + 1))
-    end
-
-    update :update_reported do
-      accept [:reported]
-      require_atomic? false
-      change set_attribute(:last_reported_at, &DateTime.utc_now/0)
-      change atomic_update(:version, expr(version + 1))
-    end
-
-    read :for_device do
-      argument :device_id, :uuid, allow_nil?: false
-      get? true
-      filter expr(device_id == ^arg(:device_id))
-    end
-  end
-
-  code_interface do
-    define :create, args: [:device_id]
-    define :update_desired, args: [:desired]
-    define :update_reported, args: [:reported]
-    define :for_device, args: [:device_id]
   end
 end

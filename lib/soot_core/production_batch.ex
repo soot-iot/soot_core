@@ -1,96 +1,32 @@
 defmodule SootCore.ProductionBatch do
   @moduledoc """
+  Default `ProductionBatch` resource shipped with `soot_core`.
+
   A manufacturing batch.
 
   Bulk-creates `Device` rows in `:unprovisioned` state. The CSV import
-  action takes a stream of `serial[,model][,metadata_json]` rows and
+  function takes a stream of `serial[,model][,metadata_json]` rows and
   validates each serial against the batch's `SerialScheme`.
+
+  The schema is provided by the `SootCore.Resource.ProductionBatch`
+  extension. This default uses `Ash.DataLayer.Ets`; production
+  deployments override with their own resource module backed by
+  `AshPostgres.DataLayer` and register it via
+  `config :soot_core, production_batch: MyApp.ProductionBatch`.
+
+  `import_csv/3` resolves `SootCore.production_batch/0`,
+  `SootCore.serial_scheme/0`, and `SootCore.device/0` at call time, so
+  it remains correct under consumer overrides.
   """
 
   use Ash.Resource,
     otp_app: :soot_core,
     domain: SootCore.Domain,
-    data_layer: Ash.DataLayer.Ets
+    data_layer: Ash.DataLayer.Ets,
+    extensions: [SootCore.Resource.ProductionBatch]
 
   ets do
     private? false
-  end
-
-  attributes do
-    uuid_primary_key :id
-
-    attribute :tenant_id, :uuid, allow_nil?: false, public?: true
-    attribute :serial_scheme_id, :uuid, allow_nil?: false, public?: true
-
-    attribute :code, :string do
-      description "Operator-facing batch identifier, e.g. \"2026-W17-A\"."
-      allow_nil? false
-      public? true
-    end
-
-    attribute :model, :string, public?: true
-
-    attribute :status, :atom do
-      constraints one_of: [:open, :closed, :archived]
-      default :open
-      allow_nil? false
-      public? true
-    end
-
-    attribute :metadata, :map, default: %{}, public?: true
-
-    create_timestamp :inserted_at
-    update_timestamp :updated_at
-  end
-
-  identities do
-    identity :unique_code_per_tenant, [:tenant_id, :code], pre_check_with: SootCore.Domain
-  end
-
-  relationships do
-    belongs_to :tenant, SootCore.Tenant do
-      attribute_writable? false
-      source_attribute :tenant_id
-      destination_attribute :id
-      public? true
-    end
-
-    belongs_to :serial_scheme, SootCore.SerialScheme do
-      attribute_writable? false
-      source_attribute :serial_scheme_id
-      destination_attribute :id
-      public? true
-    end
-
-    has_many :devices, SootCore.Device do
-      destination_attribute :batch_id
-    end
-  end
-
-  actions do
-    defaults [
-      :read,
-      :destroy,
-      create: [:tenant_id, :serial_scheme_id, :code, :model, :metadata],
-      update: [:status, :metadata]
-    ]
-
-    update :close do
-      accept []
-      require_atomic? false
-      change set_attribute(:status, :closed)
-    end
-
-    read :for_tenant do
-      argument :tenant_id, :uuid, allow_nil?: false
-      filter expr(tenant_id == ^arg(:tenant_id))
-    end
-  end
-
-  code_interface do
-    define :create, args: [:tenant_id, :serial_scheme_id, :code]
-    define :close
-    define :for_tenant, args: [:tenant_id]
   end
 
   # ─── CSV import (plain function; bulk-creates Devices) ─────────────────
@@ -113,9 +49,13 @@ defmodule SootCore.ProductionBatch do
           {:ok, %{inserted: non_neg_integer(), errors: [{integer(), term()}]}}
           | {:error, term()}
   def import_csv(batch_id, csv_blob, opts \\ []) when is_binary(csv_blob) do
-    with {:ok, batch} <- Ash.get(__MODULE__, batch_id, authorize?: false),
+    batch_module = SootCore.production_batch()
+    scheme_module = SootCore.serial_scheme()
+    device_module = SootCore.device()
+
+    with {:ok, batch} <- Ash.get(batch_module, batch_id, authorize?: false),
          {:ok, scheme} <-
-           Ash.get(SootCore.SerialScheme, batch.serial_scheme_id, authorize?: false) do
+           Ash.get(scheme_module, batch.serial_scheme_id, authorize?: false) do
       [header | rows] =
         csv_blob
         |> __MODULE__.CSV.parse_string(skip_headers: false)
@@ -132,7 +72,7 @@ defmodule SootCore.ProductionBatch do
                :ok <- SootCore.SerialScheme.validate(scheme, serial),
                attrs <- build_attrs(batch, scheme, row_map, serial, opts),
                {:ok, _device} <-
-                 SootCore.Device.create_unprovisioned(
+                 device_module.create_unprovisioned(
                    batch.tenant_id,
                    serial,
                    attrs,

@@ -1,5 +1,7 @@
 defmodule SootCore.SerialScheme do
   @moduledoc """
+  Default `SerialScheme` resource shipped with `soot_core`.
+
   Defines how device serials are formatted and validated for a tenant.
 
   A serial has the shape
@@ -11,89 +13,33 @@ defmodule SootCore.SerialScheme do
   an optional check digit is appended (`:luhn` for digit-only schemes, or
   `:none`).
 
-  Generation and validation live as plain functions so they can be called
-  during CSV import without going through Ash.
+  Generation and validation live as plain functions on this module so
+  they can be called during CSV import without going through Ash. The
+  helpers operate on any struct whose fields match the `prefix`,
+  `batch_width`, `sequence_width`, `check_digit` shape, so callers
+  remain valid even when an operator overrides the resource module via
+  `config :soot_core, serial_scheme: MyApp.SerialScheme`.
 
       iex> scheme = %SootCore.SerialScheme{prefix: "ACME-EU-WIDGET", batch_width: 4, sequence_width: 6, check_digit: :none}
       iex> SootCore.SerialScheme.generate!(scheme, 42, 1)
       "ACME-EU-WIDGET-0042-000001"
       iex> SootCore.SerialScheme.parse!(scheme, "ACME-EU-WIDGET-0042-000001")
       %{batch: 42, sequence: 1}
+
+  The schema (attributes, identities, the tenant relationship, actions)
+  is provided by the `SootCore.Resource.SerialScheme` extension.
+  Production deployments override with their own resource module backed
+  by `AshPostgres.DataLayer`.
   """
 
   use Ash.Resource,
     otp_app: :soot_core,
     domain: SootCore.Domain,
-    data_layer: Ash.DataLayer.Ets
+    data_layer: Ash.DataLayer.Ets,
+    extensions: [SootCore.Resource.SerialScheme]
 
   ets do
     private? false
-  end
-
-  attributes do
-    uuid_primary_key :id
-
-    attribute :tenant_id, :uuid, allow_nil?: false, public?: true
-
-    attribute :name, :string do
-      description "Operator-facing label, e.g. \"acme-eu-widget-v2\"."
-      allow_nil? false
-      public? true
-    end
-
-    attribute :prefix, :string do
-      description "Literal string prepended to every serial."
-      allow_nil? false
-      public? true
-    end
-
-    attribute :batch_width, :integer, default: 4, public?: true
-    attribute :sequence_width, :integer, default: 6, public?: true
-
-    attribute :check_digit, :atom do
-      constraints one_of: [:none, :luhn]
-      default :none
-      allow_nil? false
-      public? true
-    end
-
-    attribute :metadata, :map, default: %{}, public?: true
-
-    create_timestamp :inserted_at
-    update_timestamp :updated_at
-  end
-
-  identities do
-    identity :unique_name_per_tenant, [:tenant_id, :name],
-      pre_check_with: SootCore.Domain
-  end
-
-  relationships do
-    belongs_to :tenant, SootCore.Tenant do
-      public? true
-      attribute_writable? false
-      destination_attribute :id
-      source_attribute :tenant_id
-    end
-  end
-
-  actions do
-    defaults [
-      :read,
-      :destroy,
-      create: [:tenant_id, :name, :prefix, :batch_width, :sequence_width, :check_digit, :metadata],
-      update: [:name, :metadata]
-    ]
-
-    read :for_tenant do
-      argument :tenant_id, :uuid, allow_nil?: false
-      filter expr(tenant_id == ^arg(:tenant_id))
-    end
-  end
-
-  code_interface do
-    define :create, args: [:tenant_id, :name, :prefix]
-    define :for_tenant, args: [:tenant_id]
   end
 
   # ─── Pure helpers (no Ash involvement) ────────────────────────────────
@@ -163,8 +109,11 @@ defmodule SootCore.SerialScheme do
   @spec parse!(t(), String.t()) :: %{batch: non_neg_integer(), sequence: non_neg_integer()}
   def parse!(scheme, serial) do
     case parse(scheme, serial) do
-      {:ok, parts} -> parts
-      {:error, reason} -> raise ArgumentError, "could not parse #{inspect(serial)}: #{inspect(reason)}"
+      {:ok, parts} ->
+        parts
+
+      {:error, reason} ->
+        raise ArgumentError, "could not parse #{inspect(serial)}: #{inspect(reason)}"
     end
   end
 
