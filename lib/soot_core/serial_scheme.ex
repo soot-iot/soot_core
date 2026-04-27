@@ -87,21 +87,19 @@ defmodule SootCore.SerialScheme do
   @spec parse(t(), String.t()) ::
           {:ok, %{batch: non_neg_integer(), sequence: non_neg_integer()}} | {:error, term()}
   def parse(scheme, serial) when is_binary(serial) do
-    cond do
-      not String.starts_with?(serial, scheme.prefix <> "-") ->
-        {:error, :prefix_mismatch}
+    if String.starts_with?(serial, scheme.prefix <> "-") do
+      parts = String.split(serial, "-")
+      expected_len = String.split(scheme.prefix, "-") |> length()
+      expected_total = expected_len + 2 + check_extra(scheme.check_digit)
 
-      true ->
-        parts = String.split(serial, "-")
-        expected_len = String.split(scheme.prefix, "-") |> length()
-        expected_total = expected_len + 2 + check_extra(scheme.check_digit)
-
-        if length(parts) != expected_total do
-          {:error, :wrong_part_count}
-        else
-          suffix_parts = Enum.drop(parts, expected_len)
-          do_parse(scheme, suffix_parts, serial)
-        end
+      if length(parts) != expected_total do
+        {:error, :wrong_part_count}
+      else
+        suffix_parts = Enum.drop(parts, expected_len)
+        do_parse(scheme, suffix_parts, serial)
+      end
+    else
+      {:error, :prefix_mismatch}
     end
   end
 
@@ -180,16 +178,16 @@ defmodule SootCore.SerialScheme do
       digits
       |> Enum.reverse()
       |> Enum.with_index()
-      |> Enum.reduce(0, fn {d, i}, acc ->
-        # Position 0 (the position the check digit would occupy) is doubled
-        if rem(i, 2) == 0 do
-          doubled = d * 2
-          acc + if(doubled > 9, do: doubled - 9, else: doubled)
-        else
-          acc + d
-        end
-      end)
+      |> Enum.reduce(0, fn {d, i}, acc -> acc + luhn_step(d, i) end)
 
     rem(10 - rem(sum, 10), 10)
   end
+
+  # Position 0 (where the check digit would sit) and every other position is doubled.
+  defp luhn_step(d, i) when rem(i, 2) == 0 do
+    doubled = d * 2
+    if doubled > 9, do: doubled - 9, else: doubled
+  end
+
+  defp luhn_step(d, _i), do: d
 end

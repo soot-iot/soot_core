@@ -100,18 +100,16 @@ if Code.ensure_loaded?(Igniter) do
           "Which Phoenix router should the /enroll endpoint be mounted in?"
         )
 
-      cond do
-        router == nil ->
-          Igniter.add_warning(igniter, """
-          No Phoenix router found. The /enroll device-facing endpoint
-          was not mounted. After your router is set up, re-run
-          `mix igniter.install soot_core`.
-          """)
-
-        true ->
-          igniter
-          |> ensure_device_mtls_pipeline(router)
-          |> maybe_add_enroll_forward(router)
+      if router == nil do
+        Igniter.add_warning(igniter, """
+        No Phoenix router found. The /enroll device-facing endpoint
+        was not mounted. After your router is set up, re-run
+        `mix igniter.install soot_core`.
+        """)
+      else
+        igniter
+        |> ensure_device_mtls_pipeline(router)
+        |> maybe_add_enroll_forward(router)
       end
     end
 

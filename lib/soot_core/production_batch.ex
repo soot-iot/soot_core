@@ -66,26 +66,29 @@ defmodule SootCore.ProductionBatch do
         rows
         |> Stream.with_index(2)
         |> Enum.reduce(%{inserted: 0, errors: []}, fn {row, line_no}, acc ->
-          row_map = header |> Enum.zip(row) |> Map.new()
-
-          with {:ok, serial} <- fetch_required(row_map, "serial"),
-               :ok <- SootCore.SerialScheme.validate(scheme, serial),
-               attrs <- build_attrs(batch, scheme, row_map, serial, opts),
-               {:ok, _device} <-
-                 device_module.create_unprovisioned(
-                   batch.tenant_id,
-                   serial,
-                   attrs,
-                   authorize?: false
-                 ) do
-            %{acc | inserted: acc.inserted + 1}
-          else
-            {:error, reason} ->
-              %{acc | errors: [{line_no, reason} | acc.errors]}
-          end
+          process_row(acc, header, row, line_no, batch, scheme, device_module, opts)
         end)
 
       {:ok, %{result | errors: Enum.reverse(result.errors)}}
+    end
+  end
+
+  defp process_row(acc, header, row, line_no, batch, scheme, device_module, opts) do
+    row_map = header |> Enum.zip(row) |> Map.new()
+
+    with {:ok, serial} <- fetch_required(row_map, "serial"),
+         :ok <- SootCore.SerialScheme.validate(scheme, serial),
+         attrs <- build_attrs(batch, scheme, row_map, serial, opts),
+         {:ok, _device} <-
+           device_module.create_unprovisioned(
+             batch.tenant_id,
+             serial,
+             attrs,
+             authorize?: false
+           ) do
+      %{acc | inserted: acc.inserted + 1}
+    else
+      {:error, reason} -> %{acc | errors: [{line_no, reason} | acc.errors]}
     end
   end
 
