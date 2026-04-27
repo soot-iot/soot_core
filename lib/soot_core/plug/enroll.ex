@@ -84,7 +84,7 @@ defmodule SootCore.Plug.Enroll do
   defp parse_body(_), do: {:error, :missing_required_fields}
 
   defp find_token(token) do
-    case SootCore.EnrollmentToken.find_active(token, authorize?: false) do
+    case SootCore.enrollment_token().find_active(token, authorize?: false) do
       {:ok, et} -> {:ok, et}
       {:error, _} -> {:error, :invalid_or_expired_token}
     end
@@ -96,7 +96,7 @@ defmodule SootCore.Plug.Enroll do
   defp load_device(%Actor{certificate_id: cert_id}, et) do
     require Ash.Query
 
-    SootCore.Device
+    SootCore.device()
     |> Ash.Query.filter(bootstrap_certificate_id == ^cert_id and id == ^et.device_id)
     |> Ash.read_one(authorize?: false)
     |> case do
@@ -107,15 +107,15 @@ defmodule SootCore.Plug.Enroll do
   end
 
   defp load_tenant(device) do
-    case Ash.get(SootCore.Tenant, device.tenant_id, authorize?: false) do
-      {:ok, %SootCore.Tenant{status: :active, issuing_ca_id: ca_id} = tenant}
+    case Ash.get(SootCore.tenant(), device.tenant_id, authorize?: false) do
+      {:ok, %{status: :active, issuing_ca_id: ca_id} = tenant}
       when not is_nil(ca_id) ->
         {:ok, tenant}
 
-      {:ok, %SootCore.Tenant{status: status}} when status != :active ->
+      {:ok, %{status: status}} when status != :active ->
         {:error, {:tenant_not_active, status}}
 
-      {:ok, %SootCore.Tenant{issuing_ca_id: nil}} ->
+      {:ok, %{issuing_ca_id: nil}} ->
         {:error, :tenant_has_no_issuing_ca}
 
       {:error, _} ->
@@ -145,14 +145,14 @@ defmodule SootCore.Plug.Enroll do
   end
 
   defp transition_device(device, leaf) do
-    case SootCore.Device.enroll(device, leaf.id, authorize?: false) do
+    case SootCore.device().enroll(device, leaf.id, authorize?: false) do
       {:ok, updated} -> {:ok, updated}
       {:error, reason} -> {:error, {:device_transition_failed, reason}}
     end
   end
 
   defp consume_token(et) do
-    case SootCore.EnrollmentToken.consume(et, authorize?: false) do
+    case SootCore.enrollment_token().consume(et, authorize?: false) do
       {:ok, _} = ok -> ok
       {:error, reason} -> {:error, {:token_consume_failed, reason}}
     end
