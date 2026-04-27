@@ -45,7 +45,12 @@ defmodule SootCore.TenantTest do
 
   test "create accepts issuing_ca_id and metadata" do
     fake_ca_id = Ecto.UUID.generate()
-    {:ok, t} = SootCore.Tenant.create("acme", "Acme", %{issuing_ca_id: fake_ca_id, metadata: %{"region" => "eu"}})
+
+    {:ok, t} =
+      SootCore.Tenant.create("acme", "Acme", %{
+        issuing_ca_id: fake_ca_id,
+        metadata: %{"region" => "eu"}
+      })
 
     assert t.issuing_ca_id == fake_ca_id
     assert t.metadata == %{"region" => "eu"}

@@ -98,9 +98,7 @@ defmodule SootCore.Test.Factories do
     valid_until = DateTime.utc_now() |> DateTime.add(valid_for_seconds, :second)
 
     {:ok, et} =
-      SootCore.EnrollmentToken.mint(tenant_id, device_id, valid_until,
-        authorize?: false
-      )
+      SootCore.EnrollmentToken.mint(tenant_id, device_id, valid_until, authorize?: false)
 
     plaintext = et.__metadata__[:plaintext_token]
     {:ok, et, plaintext}
