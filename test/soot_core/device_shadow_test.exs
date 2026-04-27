@@ -58,6 +58,7 @@ defmodule SootCore.DeviceShadowTest do
 
   test "for_device on an unknown device id returns NotFound" do
     other_id = Ecto.UUID.generate()
+
     assert {:error, %Ash.Error.Invalid{errors: [%Ash.Error.Query.NotFound{} | _]}} =
              SootCore.DeviceShadow.for_device(other_id)
   end

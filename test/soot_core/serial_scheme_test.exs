@@ -22,6 +22,7 @@ defmodule SootCore.SerialSchemeTest do
     serial = SootCore.SerialScheme.generate!(scheme, 42, 1)
 
     assert :ok = SootCore.SerialScheme.validate(scheme, serial)
+
     assert {:error, :invalid_check_digit} =
              SootCore.SerialScheme.validate(scheme, "ACME-EU-WIDGET-0042-000001-9")
   end
@@ -29,8 +30,12 @@ defmodule SootCore.SerialSchemeTest do
   test "validate rejects malformed input", %{tenant: t} do
     scheme = Factories.fresh_scheme!(t.id, prefix: "ACME-EU-WIDGET")
 
-    assert {:error, :prefix_mismatch} = SootCore.SerialScheme.validate(scheme, "OTHER-0001-000001")
-    assert {:error, :wrong_part_count} = SootCore.SerialScheme.validate(scheme, "ACME-EU-WIDGET-0001")
+    assert {:error, :prefix_mismatch} =
+             SootCore.SerialScheme.validate(scheme, "OTHER-0001-000001")
+
+    assert {:error, :wrong_part_count} =
+             SootCore.SerialScheme.validate(scheme, "ACME-EU-WIDGET-0001")
+
     assert {:error, :invalid_numeric_component} =
              SootCore.SerialScheme.validate(scheme, "ACME-EU-WIDGET-XXXX-000001")
   end

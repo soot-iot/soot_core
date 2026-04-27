@@ -20,7 +20,9 @@ defmodule SootCore.Plug.EnrollTest do
     conn(:post, "/enroll", Jason.encode!(body))
     |> put_req_header("content-type", "application/json")
     |> put_req_header("x-client-cert", URI.encode(pem, &URI.char_unreserved?/1))
-    |> MTLS.call(MTLS.init(header_mode: {:enabled, "x-client-cert"}, require_known_certificate: true))
+    |> MTLS.call(
+      MTLS.init(header_mode: {:enabled, "x-client-cert"}, require_known_certificate: true)
+    )
     |> SootCore.Plug.Enroll.call([])
   end
 
@@ -81,7 +83,12 @@ defmodule SootCore.Plug.EnrollTest do
 
   test "token bound to another device is rejected", ctx do
     other_serial = "ACME-EU-WIDGET-0001-000002"
-    other = Factories.bootstrapped_device!(%{tenant: ctx.tenant, intermediate: ctx.intermediate}, other_serial)
+
+    other =
+      Factories.bootstrapped_device!(
+        %{tenant: ctx.tenant, intermediate: ctx.intermediate},
+        other_serial
+      )
 
     {_priv, csr_pem} = issue_csr_pem()
 
@@ -104,8 +111,13 @@ defmodule SootCore.Plug.EnrollTest do
   test "non-POST → 405", ctx do
     conn =
       conn(:get, "/enroll")
-      |> put_req_header("x-client-cert", URI.encode(ctx.bootstrap_certificate.certificate_pem, &URI.char_unreserved?/1))
-      |> MTLS.call(MTLS.init(header_mode: {:enabled, "x-client-cert"}, require_known_certificate: true))
+      |> put_req_header(
+        "x-client-cert",
+        URI.encode(ctx.bootstrap_certificate.certificate_pem, &URI.char_unreserved?/1)
+      )
+      |> MTLS.call(
+        MTLS.init(header_mode: {:enabled, "x-client-cert"}, require_known_certificate: true)
+      )
       |> SootCore.Plug.Enroll.call([])
 
     assert conn.status == 405
@@ -129,7 +141,9 @@ defmodule SootCore.Plug.EnrollTest do
       conn(:post, "/enroll", "{not json")
       |> put_req_header("content-type", "application/json")
       |> put_req_header("x-client-cert", URI.encode(pem, &URI.char_unreserved?/1))
-      |> MTLS.call(MTLS.init(header_mode: {:enabled, "x-client-cert"}, require_known_certificate: true))
+      |> MTLS.call(
+        MTLS.init(header_mode: {:enabled, "x-client-cert"}, require_known_certificate: true)
+      )
       |> SootCore.Plug.Enroll.call([])
 
     assert conn.status == 400
@@ -198,7 +212,11 @@ defmodule SootCore.Plug.EnrollTest do
     {_priv, csr_pem} = issue_csr_pem()
 
     conn =
-      conn(:post, "/enroll", Jason.encode!(%{"token" => ctx.plaintext_token, "csr_pem" => csr_pem}))
+      conn(
+        :post,
+        "/enroll",
+        Jason.encode!(%{"token" => ctx.plaintext_token, "csr_pem" => csr_pem})
+      )
       |> put_req_header("content-type", "application/json")
       |> put_req_header("x-client-cert", URI.encode(bootstrap_pem, &URI.char_unreserved?/1))
       |> MTLS.call(
