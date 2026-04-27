@@ -13,8 +13,13 @@ defmodule SootCore.MixProject do
       consolidate_protocols: Mix.env() != :test,
       deps: deps(),
       description: description(),
-      package: package()
+      package: package(),
+      aliases: aliases()
     ]
+  end
+
+  defp aliases do
+    [credo: "credo --strict"]
   end
 
   def application do
@@ -46,7 +51,8 @@ defmodule SootCore.MixProject do
       {:plug, "~> 1.19"},
       {:jason, "~> 1.4"},
       {:nimble_csv, "~> 1.3"},
-      {:igniter, "~> 0.6", optional: true}
+      {:igniter, "~> 0.6", optional: true},
+      {:credo, "~> 1.7", only: [:dev, :test], runtime: false}
     ]
   end
 end
