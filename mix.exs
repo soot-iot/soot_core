@@ -14,12 +14,22 @@ defmodule SootCore.MixProject do
       deps: deps(),
       description: description(),
       package: package(),
-      aliases: aliases()
+      aliases: aliases(),
+      dialyzer: [
+        plt_add_apps: [:mix, :ex_unit, :plug, :public_key, :crypto, :ssl],
+        plt_core_path: "priv/plts",
+        plt_local_path: "priv/plts",
+        ignore_warnings: ".dialyzer_ignore.exs",
+        list_unused_filters?: true
+      ]
     ]
   end
 
   defp aliases do
-    [credo: "credo --strict"]
+    [
+      format: "format --migrate",
+      credo: "credo --strict"
+    ]
   end
 
   def application do
@@ -47,12 +57,18 @@ defmodule SootCore.MixProject do
     [
       {:ash, "~> 3.24"},
       {:ash_state_machine, "~> 0.2"},
-      {:ash_pki, path: "../ash_pki"},
+      {:ash_pki, github: "soot-iot/ash_pki", branch: "main"},
       {:plug, "~> 1.19"},
       {:jason, "~> 1.4"},
       {:nimble_csv, "~> 1.3"},
       {:igniter, "~> 0.6", optional: true},
-      {:credo, "~> 1.7", only: [:dev, :test], runtime: false}
+
+      # Dev / test
+      {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
+      {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
+      {:ex_doc, "~> 0.34", only: [:dev], runtime: false},
+      {:mix_audit, "~> 2.1", only: [:dev, :test], runtime: false},
+      {:sobelow, "~> 0.13", only: [:dev, :test], runtime: false}
     ]
   end
 end
