@@ -52,10 +52,11 @@ defmodule SootCore.ProductionBatch do
     batch_module = SootCore.production_batch()
     scheme_module = SootCore.serial_scheme()
     device_module = SootCore.device()
+    actor = SootCore.Actors.system(:batch_provisioner)
 
-    with {:ok, batch} <- Ash.get(batch_module, batch_id, authorize?: false),
+    with {:ok, batch} <- Ash.get(batch_module, batch_id, actor: actor),
          {:ok, scheme} <-
-           Ash.get(scheme_module, batch.serial_scheme_id, authorize?: false) do
+           Ash.get(scheme_module, batch.serial_scheme_id, actor: actor) do
       [header | rows] =
         csv_blob
         |> __MODULE__.CSV.parse_string(skip_headers: false)
@@ -66,14 +67,14 @@ defmodule SootCore.ProductionBatch do
         rows
         |> Stream.with_index(2)
         |> Enum.reduce(%{inserted: 0, errors: []}, fn entry, acc ->
-          accumulate_row(entry, acc, header, batch, scheme, device_module, opts)
+          accumulate_row(entry, acc, header, batch, scheme, device_module, actor, opts)
         end)
 
       {:ok, %{result | errors: Enum.reverse(result.errors)}}
     end
   end
 
-  defp accumulate_row({row, line_no}, acc, header, batch, scheme, device_module, opts) do
+  defp accumulate_row({row, line_no}, acc, header, batch, scheme, device_module, actor, opts) do
     row_map = header |> Enum.zip(row) |> Map.new()
 
     with {:ok, serial} <- fetch_required(row_map, "serial"),
@@ -84,7 +85,7 @@ defmodule SootCore.ProductionBatch do
              batch.tenant_id,
              serial,
              attrs,
-             authorize?: false
+             actor: actor
            ) do
       %{acc | inserted: acc.inserted + 1}
     else

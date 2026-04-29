@@ -84,7 +84,7 @@ defmodule SootCore.Plug.Enroll do
   defp parse_body(_), do: {:error, :missing_required_fields}
 
   defp find_token(token) do
-    case SootCore.enrollment_token().find_active(token, authorize?: false) do
+    case SootCore.enrollment_token().find_active(token, actor: enroller()) do
       {:ok, et} -> {:ok, et}
       {:error, _} -> {:error, :invalid_or_expired_token}
     end
@@ -98,7 +98,7 @@ defmodule SootCore.Plug.Enroll do
 
     SootCore.device()
     |> Ash.Query.filter(bootstrap_certificate_id == ^cert_id and id == ^et.device_id)
-    |> Ash.read_one(authorize?: false)
+    |> Ash.read_one(actor: enroller())
     |> case do
       {:ok, nil} -> {:error, :token_device_mismatch}
       {:ok, device} -> {:ok, device}
@@ -107,7 +107,7 @@ defmodule SootCore.Plug.Enroll do
   end
 
   defp load_tenant(device) do
-    case Ash.get(SootCore.tenant(), device.tenant_id, authorize?: false) do
+    case Ash.get(SootCore.tenant(), device.tenant_id, actor: enroller()) do
       {:ok, %{status: :active, issuing_ca_id: ca_id} = tenant}
       when not is_nil(ca_id) ->
         {:ok, tenant}
@@ -138,25 +138,27 @@ defmodule SootCore.Plug.Enroll do
   end
 
   defp build_chain_pem(leaf, ca_id) do
-    case Ash.get(AshPki.CertificateAuthority, ca_id, authorize?: false) do
+    case Ash.get(AshPki.CertificateAuthority, ca_id, actor: enroller()) do
       {:ok, ca} -> leaf.certificate_pem <> ca.certificate_pem
       _ -> leaf.certificate_pem
     end
   end
 
   defp transition_device(device, leaf) do
-    case SootCore.device().enroll(device, leaf.id, authorize?: false) do
+    case SootCore.device().enroll(device, leaf.id, actor: enroller()) do
       {:ok, updated} -> {:ok, updated}
       {:error, reason} -> {:error, {:device_transition_failed, reason}}
     end
   end
 
   defp consume_token(et) do
-    case SootCore.enrollment_token().consume(et, authorize?: false) do
+    case SootCore.enrollment_token().consume(et, actor: enroller()) do
       {:ok, _} = ok -> ok
       {:error, reason} -> {:error, {:token_consume_failed, reason}}
     end
   end
+
+  defp enroller, do: SootCore.Actors.system(:enroller)
 
   defp respond(conn, status, body) do
     conn
