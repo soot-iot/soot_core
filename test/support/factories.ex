@@ -22,24 +22,35 @@ defmodule SootCore.Test.Factories do
     end
   end
 
+  # Factories use `authorize?: false` for setup. Allowed in
+  # `test/support/` per POLICY-SPEC §5.1; mirrors upstream Ash test
+  # convention.
+
   def fresh_tenant!(slug \\ "acme") do
     {:ok, root} =
-      AshPki.CertificateAuthority.create_root("root-#{slug}", "/CN=#{slug} root", %{
-        validity_days: 365
-      })
+      AshPki.CertificateAuthority.create_root(
+        "root-#{slug}",
+        "/CN=#{slug} root",
+        %{validity_days: 365},
+        authorize?: false
+      )
 
     {:ok, intermediate} =
       AshPki.CertificateAuthority.create_intermediate(
         "int-#{slug}",
         root.id,
         "/CN=#{slug} intermediate",
-        %{validity_days: 180}
+        %{validity_days: 180},
+        authorize?: false
       )
 
     {:ok, tenant} =
-      SootCore.Tenant.create(slug, "#{slug |> String.capitalize()} Inc", %{
-        issuing_ca_id: intermediate.id
-      })
+      SootCore.Tenant.create(
+        slug,
+        "#{slug |> String.capitalize()} Inc",
+        %{issuing_ca_id: intermediate.id},
+        authorize?: false
+      )
 
     %{tenant: tenant, root: root, intermediate: intermediate}
   end
@@ -49,16 +60,23 @@ defmodule SootCore.Test.Factories do
     prefix = Keyword.get(opts, :prefix, "ACME-EU-WIDGET")
 
     {:ok, scheme} =
-      SootCore.SerialScheme.create(tenant_id, name, prefix, %{
-        check_digit: Keyword.get(opts, :check_digit, :none)
-      })
+      SootCore.SerialScheme.create(
+        tenant_id,
+        name,
+        prefix,
+        %{check_digit: Keyword.get(opts, :check_digit, :none)},
+        authorize?: false
+      )
 
     scheme
   end
 
   def fresh_batch!(tenant_id, scheme_id, opts \\ []) do
     code = Keyword.get(opts, :code, "B-#{System.unique_integer([:positive])}")
-    {:ok, batch} = SootCore.ProductionBatch.create(tenant_id, scheme_id, code)
+
+    {:ok, batch} =
+      SootCore.ProductionBatch.create(tenant_id, scheme_id, code, authorize?: false)
+
     batch
   end
 
@@ -75,13 +93,17 @@ defmodule SootCore.Test.Factories do
     csr_pem = X509.CSR.to_pem(csr)
 
     {:ok, bootstrap_cert} =
-      AshPki.Certificate.issue(intermediate.id, csr_pem, %{
-        template: :client,
-        validity_days: 1
-      })
+      AshPki.Certificate.issue(
+        intermediate.id,
+        csr_pem,
+        %{template: :client, validity_days: 1},
+        authorize?: false
+      )
 
-    {:ok, device} = SootCore.Device.create_unprovisioned(tenant.id, serial)
-    {:ok, device} = SootCore.Device.bootstrap(device, bootstrap_cert.id)
+    {:ok, device} =
+      SootCore.Device.create_unprovisioned(tenant.id, serial, authorize?: false)
+
+    {:ok, device} = SootCore.Device.bootstrap(device, bootstrap_cert.id, authorize?: false)
 
     {:ok, et, plaintext} = mint_token(tenant.id, device.id)
 

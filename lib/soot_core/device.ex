@@ -30,6 +30,7 @@ defmodule SootCore.Device do
     otp_app: :soot_core,
     domain: SootCore.Domain,
     data_layer: Ash.DataLayer.Ets,
+    authorizers: [Ash.Policy.Authorizer],
     extensions: [AshStateMachine, SootCore.Resource.Device]
 
   ets do
@@ -46,6 +47,16 @@ defmodule SootCore.Device do
       transition :quarantine, from: [:operational, :bootstrapped], to: :quarantined
       transition :unquarantine, from: :quarantined, to: :operational
       transition :retire, from: [:operational, :quarantined, :bootstrapped], to: :retired
+    end
+  end
+
+  # Default policies (POLICY-SPEC §4.1).
+  policies do
+    policy always() do
+      access_type :strict
+      authorize_if actor_attribute_equals(:part, :enroller)
+      authorize_if actor_attribute_equals(:part, :batch_provisioner)
+      authorize_if actor_attribute_equals(:part, :mtls_resolver)
     end
   end
 end
