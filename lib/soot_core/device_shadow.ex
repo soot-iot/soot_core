@@ -22,9 +22,18 @@ defmodule SootCore.DeviceShadow do
     otp_app: :soot_core,
     domain: SootCore.Domain,
     data_layer: Ash.DataLayer.Ets,
+    authorizers: [Ash.Policy.Authorizer],
     extensions: [SootCore.Resource.DeviceShadow]
 
   ets do
     private? false
+  end
+
+  # Default policies (POLICY-SPEC §4.1).
+  policies do
+    policy always() do
+      access_type :strict
+      authorize_if actor_attribute_equals(:part, :device_shadow_writer)
+    end
   end
 end

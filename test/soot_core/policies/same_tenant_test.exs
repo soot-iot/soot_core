@@ -7,8 +7,8 @@ defmodule SootCore.Policies.SameTenantTest do
     Factories.reset_ets!()
     %{tenant: a} = Factories.fresh_tenant!("alpha")
     %{tenant: b} = Factories.fresh_tenant!("beta")
-    {:ok, da} = SootCore.Device.create_unprovisioned(a.id, "ALPHA-DEV-1")
-    {:ok, db} = SootCore.Device.create_unprovisioned(b.id, "BETA-DEV-1")
+    {:ok, da} = SootCore.Device.create_unprovisioned(a.id, "ALPHA-DEV-1", authorize?: false)
+    {:ok, db} = SootCore.Device.create_unprovisioned(b.id, "BETA-DEV-1", authorize?: false)
     {:ok, alpha: a, beta: b, alpha_device: da, beta_device: db}
   end
 

@@ -48,13 +48,13 @@ defmodule SootCore.SerialSchemeTest do
 
   test "unique_name_per_tenant rejects duplicates within a tenant", %{tenant: t} do
     Factories.fresh_scheme!(t.id, name: "shared", prefix: "P1")
-    assert {:error, _} = SootCore.SerialScheme.create(t.id, "shared", "P2")
+    assert {:error, _} = SootCore.SerialScheme.create(t.id, "shared", "P2", authorize?: false)
   end
 
   test "unique_name_per_tenant allows reusing a name across tenants", %{tenant: t1} do
     %{tenant: t2} = Factories.fresh_tenant!("beta")
     Factories.fresh_scheme!(t1.id, name: "shared", prefix: "P1")
-    assert {:ok, _} = SootCore.SerialScheme.create(t2.id, "shared", "P2")
+    assert {:ok, _} = SootCore.SerialScheme.create(t2.id, "shared", "P2", authorize?: false)
   end
 
   test "for_tenant lists only the tenant's schemes", %{tenant: t1} do
@@ -63,7 +63,7 @@ defmodule SootCore.SerialSchemeTest do
     Factories.fresh_scheme!(t1.id, name: "alpha-2", prefix: "P2")
     Factories.fresh_scheme!(t2.id, name: "beta-1", prefix: "P3")
 
-    {:ok, schemes} = SootCore.SerialScheme.for_tenant(t1.id)
+    {:ok, schemes} = SootCore.SerialScheme.for_tenant(t1.id, authorize?: false)
     assert length(schemes) == 2
     assert Enum.all?(schemes, &(&1.tenant_id == t1.id))
   end
