@@ -36,6 +36,7 @@ defmodule SootCore.SerialScheme do
     otp_app: :soot_core,
     domain: SootCore.Domain,
     data_layer: Ash.DataLayer.Ets,
+    authorizers: [Ash.Policy.Authorizer],
     extensions: [SootCore.Resource.SerialScheme]
 
   ets do
@@ -188,4 +189,11 @@ defmodule SootCore.SerialScheme do
   defp luhn_step(d, i) when rem(i, 2) == 0 and d * 2 > 9, do: d * 2 - 9
   defp luhn_step(d, i) when rem(i, 2) == 0, do: d * 2
   defp luhn_step(d, _i), do: d
+  # Default policies (POLICY-SPEC §4.1).
+  policies do
+    policy always() do
+      access_type :strict
+      authorize_if actor_attribute_equals(:part, :batch_provisioner)
+    end
+  end
 end
