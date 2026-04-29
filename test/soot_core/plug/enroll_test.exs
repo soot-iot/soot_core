@@ -168,9 +168,14 @@ defmodule SootCore.Plug.EnrollTest do
     # issuing_ca_id, but reuse the existing bootstrap cert (still on
     # file in AshPki) so MTLS passes and the enrollment plug reaches
     # the tenant resolution step.
-    {:ok, broken_tenant} = SootCore.Tenant.create("broken", "Broken Tenant")
-    {:ok, broken_device} = SootCore.Device.create_unprovisioned(broken_tenant.id, "BROKEN-1")
-    {:ok, broken_device} = SootCore.Device.bootstrap(broken_device, ctx.bootstrap_certificate.id)
+    {:ok, broken_tenant} = SootCore.Tenant.create("broken", "Broken Tenant", authorize?: false)
+
+    {:ok, broken_device} =
+      SootCore.Device.create_unprovisioned(broken_tenant.id, "BROKEN-1", authorize?: false)
+
+    {:ok, broken_device} =
+      SootCore.Device.bootstrap(broken_device, ctx.bootstrap_certificate.id, authorize?: false)
+
     {:ok, _et, plaintext} = Factories.mint_token(broken_tenant.id, broken_device.id)
 
     {_priv, csr_pem} = issue_csr_pem()
@@ -186,7 +191,7 @@ defmodule SootCore.Plug.EnrollTest do
   end
 
   test "suspended tenant → 403", ctx do
-    {:ok, _} = SootCore.Tenant.suspend(ctx.tenant)
+    {:ok, _} = SootCore.Tenant.suspend(ctx.tenant, authorize?: false)
 
     {_priv, csr_pem} = issue_csr_pem()
 
