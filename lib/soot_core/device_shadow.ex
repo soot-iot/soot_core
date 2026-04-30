@@ -34,6 +34,7 @@ defmodule SootCore.DeviceShadow do
     policy always() do
       access_type :strict
       authorize_if actor_attribute_equals(:part, :device_shadow_writer)
+      authorize_if actor_attribute_equals(:part, :seed)
     end
   end
 end

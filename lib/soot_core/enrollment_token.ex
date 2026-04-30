@@ -38,6 +38,7 @@ defmodule SootCore.EnrollmentToken do
       access_type :strict
       authorize_if actor_attribute_equals(:part, :enroller)
       authorize_if actor_attribute_equals(:part, :batch_provisioner)
+      authorize_if actor_attribute_equals(:part, :seed)
     end
   end
 end
