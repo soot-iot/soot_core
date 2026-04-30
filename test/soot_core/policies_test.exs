@@ -36,6 +36,11 @@ defmodule SootCore.PoliciesTest do
       assert {:error, %Ash.Error.Forbidden{}} =
                Ash.get(SootCore.Tenant, tenant.id, actor: Actors.system(:mtls_resolver))
     end
+
+    test ":seed can read", %{tenant: tenant} do
+      assert {:ok, ^tenant} =
+               Ash.get(SootCore.Tenant, tenant.id, actor: Actors.system(:seed))
+    end
   end
 
   describe "SootCore.Device" do
@@ -62,6 +67,11 @@ defmodule SootCore.PoliciesTest do
     test "no actor is forbidden", %{device: device} do
       assert {:error, %Ash.Error.Forbidden{}} = Ash.get(SootCore.Device, device.id)
     end
+
+    test ":seed can read", %{device: device} do
+      assert {:ok, ^device} =
+               Ash.get(SootCore.Device, device.id, actor: Actors.system(:seed))
+    end
   end
 
   describe "SootCore.ProductionBatch" do
@@ -80,6 +90,11 @@ defmodule SootCore.PoliciesTest do
     test "no actor is forbidden", %{batch: batch} do
       assert {:error, %Ash.Error.Forbidden{}} = Ash.get(SootCore.ProductionBatch, batch.id)
     end
+
+    test ":seed can read", %{batch: batch} do
+      assert {:ok, ^batch} =
+               Ash.get(SootCore.ProductionBatch, batch.id, actor: Actors.system(:seed))
+    end
   end
 
   describe "SootCore.SerialScheme" do
@@ -90,6 +105,11 @@ defmodule SootCore.PoliciesTest do
 
     test "no actor is forbidden", %{scheme: scheme} do
       assert {:error, %Ash.Error.Forbidden{}} = Ash.get(SootCore.SerialScheme, scheme.id)
+    end
+
+    test ":seed can read", %{scheme: scheme} do
+      assert {:ok, ^scheme} =
+               Ash.get(SootCore.SerialScheme, scheme.id, actor: Actors.system(:seed))
     end
   end
 
@@ -124,6 +144,13 @@ defmodule SootCore.PoliciesTest do
     test "no actor is forbidden", %{token: token} do
       assert {:error, %Ash.Error.Forbidden{}} = Ash.get(SootCore.EnrollmentToken, token.id)
     end
+
+    test ":seed can read", %{token: token} do
+      assert {:ok, %{id: id}} =
+               Ash.get(SootCore.EnrollmentToken, token.id, actor: Actors.system(:seed))
+
+      assert id == token.id
+    end
   end
 
   describe "SootCore.DeviceShadow" do
@@ -146,6 +173,11 @@ defmodule SootCore.PoliciesTest do
 
     test "no actor is forbidden", %{shadow: shadow} do
       assert {:error, %Ash.Error.Forbidden{}} = Ash.get(SootCore.DeviceShadow, shadow.id)
+    end
+
+    test ":seed can read", %{shadow: shadow} do
+      assert {:ok, ^shadow} =
+               Ash.get(SootCore.DeviceShadow, shadow.id, actor: Actors.system(:seed))
     end
   end
 end
