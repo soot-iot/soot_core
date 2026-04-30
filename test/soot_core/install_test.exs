@@ -309,6 +309,41 @@ defmodule Mix.Tasks.SootCore.InstallTest do
       refute content =~ "soot_core do"
     end
 
+    test "every generated resource carries Ash.Policy.Authorizer and a policies block" do
+      result =
+        project_with_router()
+        |> Igniter.compose_task("soot_core.install", [])
+
+      for path <- @resource_files do
+        content = generated_source(result, path)
+
+        assert content =~ "authorizers: [Ash.Policy.Authorizer]",
+               "expected authorizer in #{path}"
+
+        assert content =~ "policies do",
+               "expected policies block in #{path}"
+
+        assert content =~ "bypass actor_attribute_equals(:role, :admin) do",
+               "expected admin bypass in #{path}"
+      end
+    end
+
+    test "Tenant policies block uses OwnTenant, others use SameTenant or relationship expr" do
+      result =
+        project_with_router()
+        |> Igniter.compose_task("soot_core.install", [])
+
+      assert generated_source(result, "lib/test/tenant.ex") =~ "SootCore.Policies.OwnTenant"
+
+      for path <- ["lib/test/serial_scheme.ex", "lib/test/production_batch.ex",
+                   "lib/test/device.ex", "lib/test/enrollment_token.ex"] do
+        assert generated_source(result, path) =~ "SootCore.Policies.SameTenant"
+      end
+
+      assert generated_source(result, "lib/test/device_shadow.ex") =~
+               "device.tenant_id == ^actor(:tenant_id)"
+    end
+
     test "registers all six modules in config/config.exs under :soot_core" do
       result =
         project_with_router()

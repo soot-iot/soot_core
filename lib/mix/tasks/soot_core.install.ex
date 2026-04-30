@@ -194,11 +194,25 @@ if Code.ensure_loaded?(Igniter) do
         otp_app: :#{otp_app(igniter)},
         domain: SootCore.Domain,
         data_layer: AshPostgres.DataLayer,
+        authorizers: [Ash.Policy.Authorizer],
         extensions: [SootCore.Resource.Tenant]
 
       postgres do
         table "tenants"
         repo #{inspect(repo)}
+      end
+
+      # Mirrors `SootCore.Tenant`'s default policies (POLICY-SPEC §4.1).
+      policies do
+        bypass actor_attribute_equals(:role, :admin) do
+          authorize_if SootCore.Policies.OwnTenant
+        end
+
+        policy always() do
+          access_type :strict
+          authorize_if actor_attribute_equals(:part, :enroller)
+          authorize_if actor_attribute_equals(:part, :seed)
+        end
       end
       """
     end
@@ -220,6 +234,7 @@ if Code.ensure_loaded?(Igniter) do
         otp_app: :#{otp_app(igniter)},
         domain: SootCore.Domain,
         data_layer: AshPostgres.DataLayer,
+        authorizers: [Ash.Policy.Authorizer],
         extensions: [SootCore.Resource.SerialScheme]
 
       postgres do
@@ -229,6 +244,19 @@ if Code.ensure_loaded?(Igniter) do
 
       soot_core do
         tenant #{inspect(tenant)}
+      end
+
+      # Mirrors `SootCore.SerialScheme`'s default policies (POLICY-SPEC §4.1).
+      policies do
+        bypass actor_attribute_equals(:role, :admin) do
+          authorize_if SootCore.Policies.SameTenant
+        end
+
+        policy always() do
+          access_type :strict
+          authorize_if actor_attribute_equals(:part, :batch_provisioner)
+          authorize_if actor_attribute_equals(:part, :seed)
+        end
       end
       """
     end
@@ -252,6 +280,7 @@ if Code.ensure_loaded?(Igniter) do
         otp_app: :#{otp_app(igniter)},
         domain: SootCore.Domain,
         data_layer: AshPostgres.DataLayer,
+        authorizers: [Ash.Policy.Authorizer],
         extensions: [SootCore.Resource.ProductionBatch]
 
       postgres do
@@ -263,6 +292,19 @@ if Code.ensure_loaded?(Igniter) do
         tenant #{inspect(tenant)}
         serial_scheme #{inspect(serial_scheme)}
         device #{inspect(device)}
+      end
+
+      # Mirrors `SootCore.ProductionBatch`'s default policies (POLICY-SPEC §4.1).
+      policies do
+        bypass actor_attribute_equals(:role, :admin) do
+          authorize_if SootCore.Policies.SameTenant
+        end
+
+        policy always() do
+          access_type :strict
+          authorize_if actor_attribute_equals(:part, :batch_provisioner)
+          authorize_if actor_attribute_equals(:part, :seed)
+        end
       end
       """
     end
@@ -289,6 +331,7 @@ if Code.ensure_loaded?(Igniter) do
         otp_app: :#{otp_app(igniter)},
         domain: SootCore.Domain,
         data_layer: AshPostgres.DataLayer,
+        authorizers: [Ash.Policy.Authorizer],
         extensions: [AshStateMachine, SootCore.Resource.Device]
 
       postgres do
@@ -314,6 +357,21 @@ if Code.ensure_loaded?(Igniter) do
         production_batch #{inspect(production_batch)}
         device_shadow #{inspect(device_shadow)}
       end
+
+      # Mirrors `SootCore.Device`'s default policies (POLICY-SPEC §4.1).
+      policies do
+        bypass actor_attribute_equals(:role, :admin) do
+          authorize_if SootCore.Policies.SameTenant
+        end
+
+        policy always() do
+          access_type :strict
+          authorize_if actor_attribute_equals(:part, :enroller)
+          authorize_if actor_attribute_equals(:part, :batch_provisioner)
+          authorize_if actor_attribute_equals(:part, :mtls_resolver)
+          authorize_if actor_attribute_equals(:part, :seed)
+        end
+      end
       """
     end
 
@@ -334,6 +392,7 @@ if Code.ensure_loaded?(Igniter) do
         otp_app: :#{otp_app(igniter)},
         domain: SootCore.Domain,
         data_layer: AshPostgres.DataLayer,
+        authorizers: [Ash.Policy.Authorizer],
         extensions: [SootCore.Resource.DeviceShadow]
 
       postgres do
@@ -343,6 +402,19 @@ if Code.ensure_loaded?(Igniter) do
 
       soot_core do
         device #{inspect(device)}
+      end
+
+      # Mirrors `SootCore.DeviceShadow`'s default policies (POLICY-SPEC §4.1).
+      policies do
+        bypass actor_attribute_equals(:role, :admin) do
+          authorize_if expr(device.tenant_id == ^actor(:tenant_id))
+        end
+
+        policy always() do
+          access_type :strict
+          authorize_if actor_attribute_equals(:part, :device_shadow_writer)
+          authorize_if actor_attribute_equals(:part, :seed)
+        end
       end
       """
     end
@@ -362,11 +434,26 @@ if Code.ensure_loaded?(Igniter) do
         otp_app: :#{otp_app(igniter)},
         domain: SootCore.Domain,
         data_layer: AshPostgres.DataLayer,
+        authorizers: [Ash.Policy.Authorizer],
         extensions: [SootCore.Resource.EnrollmentToken]
 
       postgres do
         table "enrollment_tokens"
         repo #{inspect(repo)}
+      end
+
+      # Mirrors `SootCore.EnrollmentToken`'s default policies (POLICY-SPEC §4.1).
+      policies do
+        bypass actor_attribute_equals(:role, :admin) do
+          authorize_if SootCore.Policies.SameTenant
+        end
+
+        policy always() do
+          access_type :strict
+          authorize_if actor_attribute_equals(:part, :enroller)
+          authorize_if actor_attribute_equals(:part, :batch_provisioner)
+          authorize_if actor_attribute_equals(:part, :seed)
+        end
       end
       """
     end

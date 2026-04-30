@@ -41,6 +41,18 @@ defmodule SootCore.PoliciesTest do
       assert {:ok, ^tenant} =
                Ash.get(SootCore.Tenant, tenant.id, actor: Actors.system(:seed))
     end
+
+    test "admin in own tenant can read", %{tenant: tenant} do
+      assert {:ok, ^tenant} =
+               Ash.get(SootCore.Tenant, tenant.id, actor: Actors.admin(tenant.id))
+    end
+
+    test "admin in another tenant cannot see the row", %{tenant: tenant} do
+      other_id = Ash.UUID.generate()
+
+      assert {:error, %Ash.Error.Invalid{errors: [%Ash.Error.Query.NotFound{}]}} =
+               Ash.get(SootCore.Tenant, tenant.id, actor: Actors.admin(other_id))
+    end
   end
 
   describe "SootCore.Device" do
@@ -72,6 +84,16 @@ defmodule SootCore.PoliciesTest do
       assert {:ok, ^device} =
                Ash.get(SootCore.Device, device.id, actor: Actors.system(:seed))
     end
+
+    test "admin in same tenant can read", %{device: device, tenant: tenant} do
+      assert {:ok, ^device} =
+               Ash.get(SootCore.Device, device.id, actor: Actors.admin(tenant.id))
+    end
+
+    test "admin in another tenant cannot see the row", %{device: device} do
+      assert {:error, %Ash.Error.Invalid{errors: [%Ash.Error.Query.NotFound{}]}} =
+               Ash.get(SootCore.Device, device.id, actor: Actors.admin(Ash.UUID.generate()))
+    end
   end
 
   describe "SootCore.ProductionBatch" do
@@ -95,6 +117,18 @@ defmodule SootCore.PoliciesTest do
       assert {:ok, ^batch} =
                Ash.get(SootCore.ProductionBatch, batch.id, actor: Actors.system(:seed))
     end
+
+    test "admin in same tenant can read", %{batch: batch, tenant: tenant} do
+      assert {:ok, ^batch} =
+               Ash.get(SootCore.ProductionBatch, batch.id, actor: Actors.admin(tenant.id))
+    end
+
+    test "admin in another tenant cannot see the row", %{batch: batch} do
+      assert {:error, %Ash.Error.Invalid{errors: [%Ash.Error.Query.NotFound{}]}} =
+               Ash.get(SootCore.ProductionBatch, batch.id,
+                 actor: Actors.admin(Ash.UUID.generate())
+               )
+    end
   end
 
   describe "SootCore.SerialScheme" do
@@ -110,6 +144,16 @@ defmodule SootCore.PoliciesTest do
     test ":seed can read", %{scheme: scheme} do
       assert {:ok, ^scheme} =
                Ash.get(SootCore.SerialScheme, scheme.id, actor: Actors.system(:seed))
+    end
+
+    test "admin in same tenant can read", %{scheme: scheme, tenant: tenant} do
+      assert {:ok, ^scheme} =
+               Ash.get(SootCore.SerialScheme, scheme.id, actor: Actors.admin(tenant.id))
+    end
+
+    test "admin in another tenant cannot see the row", %{scheme: scheme} do
+      assert {:error, %Ash.Error.Invalid{errors: [%Ash.Error.Query.NotFound{}]}} =
+               Ash.get(SootCore.SerialScheme, scheme.id, actor: Actors.admin(Ash.UUID.generate()))
     end
   end
 
@@ -151,6 +195,20 @@ defmodule SootCore.PoliciesTest do
 
       assert id == token.id
     end
+
+    test "admin in same tenant can read", %{token: token, tenant: tenant} do
+      assert {:ok, %{id: id}} =
+               Ash.get(SootCore.EnrollmentToken, token.id, actor: Actors.admin(tenant.id))
+
+      assert id == token.id
+    end
+
+    test "admin in another tenant cannot see the row", %{token: token} do
+      assert {:error, %Ash.Error.Invalid{errors: [%Ash.Error.Query.NotFound{}]}} =
+               Ash.get(SootCore.EnrollmentToken, token.id,
+                 actor: Actors.admin(Ash.UUID.generate())
+               )
+    end
   end
 
   describe "SootCore.DeviceShadow" do
@@ -178,6 +236,18 @@ defmodule SootCore.PoliciesTest do
     test ":seed can read", %{shadow: shadow} do
       assert {:ok, ^shadow} =
                Ash.get(SootCore.DeviceShadow, shadow.id, actor: Actors.system(:seed))
+    end
+
+    test "admin in same tenant can read", %{shadow: shadow, tenant: tenant} do
+      assert {:ok, %SootCore.DeviceShadow{id: id}} =
+               Ash.get(SootCore.DeviceShadow, shadow.id, actor: Actors.admin(tenant.id))
+
+      assert id == shadow.id
+    end
+
+    test "admin in another tenant cannot see the row", %{shadow: shadow} do
+      assert {:error, %Ash.Error.Invalid{errors: [%Ash.Error.Query.NotFound{}]}} =
+               Ash.get(SootCore.DeviceShadow, shadow.id, actor: Actors.admin(Ash.UUID.generate()))
     end
   end
 end
