@@ -335,8 +335,12 @@ defmodule Mix.Tasks.SootCore.InstallTest do
 
       assert generated_source(result, "lib/test/tenant.ex") =~ "SootCore.Policies.OwnTenant"
 
-      for path <- ["lib/test/serial_scheme.ex", "lib/test/production_batch.ex",
-                   "lib/test/device.ex", "lib/test/enrollment_token.ex"] do
+      for path <- [
+            "lib/test/serial_scheme.ex",
+            "lib/test/production_batch.ex",
+            "lib/test/device.ex",
+            "lib/test/enrollment_token.ex"
+          ] do
         assert generated_source(result, path) =~ "SootCore.Policies.SameTenant"
       end
 
