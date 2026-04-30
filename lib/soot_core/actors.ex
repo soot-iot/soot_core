@@ -70,4 +70,17 @@ defmodule SootCore.Actors do
   """
   @spec user(struct()) :: struct()
   def user(%_{} = user), do: user
+
+  @doc """
+  Build a stand-in admin actor for tests.
+
+  In a generated app the admin actor is a `MyApp.Accounts.User` row
+  with `role: :admin` and the user's `tenant_id`. Library tests don't
+  have that resource, so this helper fabricates a plain struct with
+  the same shape — `Ash.Policy.Authorizer` only reads `:role` and
+  `:tenant_id` off the actor, so the struct module doesn't matter.
+  """
+  @spec admin(binary()) :: %{role: :admin, tenant_id: binary()}
+  def admin(tenant_id) when is_binary(tenant_id),
+    do: %{role: :admin, tenant_id: tenant_id}
 end

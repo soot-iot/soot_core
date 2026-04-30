@@ -34,6 +34,10 @@ defmodule SootCore.EnrollmentToken do
 
   # Default policies (POLICY-SPEC §4.1).
   policies do
+    bypass actor_attribute_equals(:role, :admin) do
+      authorize_if SootCore.Policies.SameTenant
+    end
+
     policy always() do
       access_type :strict
       authorize_if actor_attribute_equals(:part, :enroller)
